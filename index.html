@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hustle Games — Live Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#05070f;
+    --navy:#0a0e22;
+    --navy-light:#121937;
+    --line: rgba(255,255,255,0.07);
+    --gold:#F2BB46;
+    --gold-soft: rgba(242,187,70,0.10);
+    --gold-line: rgba(242,187,70,0.35);
+    --red:#E5484D;
+    --red-soft: rgba(229,72,77,0.08);
+    --neutral-bar:#2B3357;
+    --neutral-text:#5B6690;
+    --text-primary:#F4F6FF;
+    --text-secondary:#93A0C7;
+    --text-muted:#4B567C;
+    --green:#34D399;
+
+    --fs-brand: clamp(13px, 1.3vw, 18px);
+    --fs-bigtitle: clamp(16px, 1.8vw, 24px);
+    --fs-sub: clamp(9px, 0.85vw, 11px);
+    --fs-colhead: clamp(7.5px, 0.7vw, 9px);
+    --fs-row: clamp(10px, 0.9vw, 12.5px);
+    --fs-rank: clamp(10.5px, 1vw, 13.5px);
+    --fs-pts: clamp(10.5px, 1vw, 13.5px);
+    --fs-footer: clamp(8.5px, 0.8vw, 10.5px);
+
+    --cols: 6px 40px minmax(0,1fr) 150px 60px;
+    --row-h: clamp(20px, 2.6vh, 28px);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(1200px 700px at 18% -10%, rgba(36,52,110,0.35), transparent 60%),
+      radial-gradient(1000px 600px at 85% 110%, rgba(36,52,110,0.25), transparent 60%),
+      linear-gradient(180deg, var(--navy-deep), var(--navy) 40%, var(--navy-deep));
+    color: var(--text-primary);
+    font-family:'Poppins', sans-serif;
+    overflow:hidden;
+  }
+  body.kiosk{ cursor:none; }
+
+  .topbar{
+    height: 56px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .brand{
+    font-family:'Montserrat', sans-serif;
+    font-weight:900;
+    font-size: var(--fs-brand);
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+  }
+  .brand span{ color: var(--gold); }
+
+  .status{
+    display:flex; align-items:center; gap:10px;
+    font-family:'Poppins', sans-serif;
+    font-weight:600;
+    font-size: var(--fs-sub);
+    letter-spacing: 0.14em;
+    color: var(--text-secondary);
+  }
+  .dot{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .ts{ color: var(--text-muted); font-weight:500; letter-spacing:0.02em; }
+
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.25; }
+  }
+
+  .tabbar{
+    height:48px;
+    display:flex; align-items:flex-end; gap:4px;
+    padding:0 28px;
+    border-bottom:1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent);
+    flex-wrap:wrap;
+  }
+  .tab{
+    background:transparent; border:none; appearance:none;
+    color: var(--text-secondary);
+    font-family:'Poppins', sans-serif;
+    font-weight:600;
+    font-size: clamp(11px, 1vw, 13px);
+    letter-spacing: 0.10em;
+    text-transform:uppercase;
+    padding: 12px 18px 11px;
+    cursor:pointer;
+    position:relative;
+    transition: color .15s ease;
+  }
+  .tab:hover{ color: var(--text-primary); }
+  .tab.active{ color: var(--gold); }
+  .tab.active::after{
+    content:''; position:absolute; left:14px; right:14px; bottom:-1px; height:2px;
+    background: var(--gold); border-radius:2px; box-shadow: 0 0 8px var(--gold-line);
+  }
+
+  .board{
+    height: calc(100vh - 56px - 48px);
+    position:relative;
+  }
+  .panel{
+    position:absolute; inset:0;
+    display:none;
+  }
+  .panel.active{ display:block; }
+
+  .leaderboard-row, .cs-row{
+    width:100%; height:100%;
+    display:flex;
+  }
+
+  .cs-col{
+    flex:1 1 0; min-width:0;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    padding: 32px;
+    border-right: 1px solid var(--line);
+  }
+  .cs-col:last-child{ border-right:none; }
+
+  .cs-wrap{ max-width:560px; }
+  .cs-eyebrow{
+    font-size: var(--fs-sub); letter-spacing:0.2em; text-transform:uppercase;
+    color: var(--text-muted); font-weight:600; margin-bottom:14px;
+  }
+  .cs-title{
+    font-family:'Montserrat', sans-serif; font-weight:900;
+    font-size: clamp(34px, 5vw, 72px);
+    color: var(--text-primary); letter-spacing:-0.01em; line-height:1;
+  }
+  .cs-sub{
+    margin-top:14px; font-style:italic; font-weight:600;
+    font-size: clamp(15px, 1.8vw, 22px); color: var(--gold);
+  }
+  .cs-note{
+    margin-top:18px; font-size: var(--fs-sub); color: var(--text-muted); line-height:1.6;
+  }
+
+  .col{
+    flex:1 1 0; min-width:0;
+    display:flex; flex-direction:column;
+    height:100%;
+    padding: 16px 18px 12px;
+    border-right: 1px solid var(--line);
+    overflow-y:auto;
+    position:relative;
+  }
+  .col:last-child{ border-right:none; }
+  .col::-webkit-scrollbar{ width:0; height:0; }
+
+  .cat-title{
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  }
+  .cat-title .name{
+    font-family:'Montserrat', sans-serif;
+    font-weight:900;
+    font-size: var(--fs-bigtitle);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .cat-title .sep{ color: var(--gold); font-weight:900; font-size: var(--fs-bigtitle); }
+  .cat-title .count{
+    font-size: var(--fs-sub);
+    font-weight:600;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+  .cat-sub{
+    margin-top:4px;
+    font-style: italic;
+    font-weight:500;
+    font-size: var(--fs-sub);
+    color: var(--gold);
+    opacity:0.85;
+    letter-spacing:0.01em;
+  }
+
+  .colhead{
+    margin-top:10px;
+    display:grid;
+    grid-template-columns: var(--cols);
+    gap: 10px;
+    padding: 0 4px 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--fs-colhead);
+    font-weight:700;
+    letter-spacing: 0.14em;
+    color: var(--text-secondary);
+    text-transform:uppercase;
+  }
+  .colhead span:nth-child(5){ text-align:right; }
+
+  .eyebrow{
+    margin-top:8px; margin-bottom:4px;
+    font-size: var(--fs-colhead);
+    font-weight:700;
+    letter-spacing: 0.16em;
+    text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow.gold{ color: var(--gold); }
+  .eyebrow.muted{ color: var(--text-muted); }
+  .eyebrow::after{
+    content:''; flex:1; height:1px; background: var(--line);
+  }
+
+  .podium{
+    border-top: 1px solid var(--gold-line);
+    border-bottom: 1px solid var(--gold-line);
+    background: linear-gradient(180deg, var(--gold-soft), transparent 70%);
+    border-radius: 6px;
+    padding: 2px 0;
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns: var(--cols);
+    align-items:center;
+    gap: 10px;
+    padding: 0 4px;
+    height: var(--row-h);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .row .bar{ width:6px; height:60%; border-radius:3px; }
+  .row .rank{ font-weight:800; font-size: var(--fs-rank); font-family:'Poppins',sans-serif; }
+  .row .email{
+    font-weight:600; font-size: var(--fs-row); color: var(--text-primary);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .row .pod{
+    font-size: calc(var(--fs-row) - 1px); color: var(--text-secondary);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .row .pts{ font-weight:700; font-size: var(--fs-pts); color: var(--text-primary); text-align:right; }
+
+  .row.tier-gold .bar{ background: var(--gold); box-shadow: 0 0 6px var(--gold-line); }
+  .row.tier-gold .rank{ color: var(--gold); }
+
+  .row.tier-red .bar{ background: var(--red); }
+  .row.tier-red .rank{ color: var(--red); }
+
+  .row.tier-neutral .bar{ background: var(--neutral-bar); }
+  .row.tier-neutral .rank{ color: var(--neutral-text); }
+  .row.tier-neutral .email{ color: var(--text-secondary); font-weight:500; }
+  .row.tier-neutral .pod{ color: var(--text-muted); }
+  .row.tier-neutral .pts{ color: var(--text-secondary); font-weight:600; }
+
+  .row .pts.leader{ color: var(--gold); text-shadow: 0 0 12px var(--gold-line); }
+
+  .scroll-viewport{
+    flex:1 1 120px;
+    min-height:90px;
+    overflow:hidden;
+    margin-top:2px;
+    -webkit-mask-image: linear-gradient(180deg, black 88%, transparent 100%);
+            mask-image: linear-gradient(180deg, black 88%, transparent 100%);
+  }
+  .scroll-track{
+    will-change: transform;
+  }
+
+  .footer-note{
+    margin-top:10px;
+    font-style: italic;
+    font-size: var(--fs-footer);
+    color: var(--text-muted);
+    line-height:1.4;
+    border-top: 1px solid var(--line);
+    padding-top:8px;
+  }
+
+  .loading{
+    position:fixed; inset:0; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background: var(--navy-deep);
+    font-family:'Montserrat',sans-serif;
+    font-weight:800;
+    letter-spacing:0.12em;
+    color: var(--gold);
+    font-size: clamp(14px,1.6vw,20px);
+    animation: fadeFlicker 1.4s ease-in-out infinite;
+  }
+  @keyframes fadeFlicker{ 0%,100%{opacity:0.55;} 50%{opacity:1;} }
+  .loading.hidden{ display:none; }
+
+  @media (max-width: 980px){
+    .tabbar{ padding:0 14px; }
+    html,body{ cursor:auto; overflow:auto; }
+    .board{ height:auto; position:static; }
+    .panel{ position:static; display:none; }
+    .panel.active{ display:block; }
+    .leaderboard-row, .cs-row{ flex-direction:column; height:auto; }
+    .col{ border-right:none; border-bottom:1px solid var(--line); height:auto; max-height:70vh; padding:16px; }
+    .cs-col{ border-right:none; border-bottom:1px solid var(--line); padding:24px 16px; }
+    .scroll-viewport{ min-height:180px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .scroll-track{ animation: none !important; }
+    .dot{ animation:none !important; }
+    .loading{ animation:none !important; }
+  }
+
+  .hidden{ display:none !important; }
+
+  .setup-overlay{
+    position:fixed; inset:0; z-index:100;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(5,7,15,0.92);
+    backdrop-filter: blur(6px);
+    padding: 24px;
+  }
+  .setup-card{
+    width: min(560px, 100%);
+    background: var(--navy-light);
+    border: 1px solid var(--gold-line);
+    border-radius: 10px;
+    padding: 28px 28px 24px;
+    box-shadow: 0 0 40px rgba(242,187,70,0.08);
+  }
+  .setup-title{
+    font-family:'Montserrat', sans-serif;
+    font-weight:900;
+    font-size: clamp(18px,2vw,24px);
+    color: var(--text-primary);
+    margin-bottom:8px;
+  }
+  .setup-help{
+    font-size: var(--fs-sub);
+    color: var(--text-secondary);
+    line-height:1.5;
+    margin-bottom:18px;
+  }
+  .setup-help b{ color: var(--gold); font-weight:600; }
+  #setup-input{
+    width:100%;
+    background: var(--navy-deep);
+    border: 1px solid var(--line);
+    border-radius:6px;
+    padding: 12px 14px;
+    font-family:'Poppins', sans-serif;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline:none;
+    margin-bottom:14px;
+  }
+  #setup-input:focus{ border-color: var(--gold-line); box-shadow: 0 0 0 3px var(--gold-soft); }
+  #setup-save{
+    width:100%;
+    background: var(--gold);
+    color: #1a1300;
+    border:none;
+    border-radius:6px;
+    padding: 12px 14px;
+    font-family:'Poppins', sans-serif;
+    font-weight:700;
+    letter-spacing:0.04em;
+    font-size: 13px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  #setup-save:hover{ background:#FFD37A; }
+  .setup-note{
+    margin-top:14px;
+    font-size:11px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">HUSTLE <span>GAMES</span></div>
+    <div class="status"><span class="dot"></span><span>LIVE</span><span class="ts" id="ts">--:--:--</span></div>
+  </div>
+
+  <div class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="leaderboard">Leaderboard</button>
+    <button class="tab" data-tab="managers-agm">Managers &amp; AGM</button>
+  </div>
+
+  <div class="board" id="board">
+    <div class="panel active" data-panel="leaderboard">
+      <div class="leaderboard-row" id="leaderboard-row"></div>
+    </div>
+    <div class="panel" data-panel="managers-agm">
+      <div class="cs-row">
+        <div class="cs-col">
+          <div class="cs-wrap">
+            <div class="cs-eyebrow">Hustle Games</div>
+            <div class="cs-title">Managers</div>
+            <div class="cs-sub">Coming soon</div>
+            <div class="cs-note">Manager-level rankings are being wired up next.</div>
+          </div>
+        </div>
+        <div class="cs-col">
+          <div class="cs-wrap">
+            <div class="cs-eyebrow">Hustle Games</div>
+            <div class="cs-title">AGM</div>
+            <div class="cs-sub">Coming soon</div>
+            <div class="cs-note">AGM-level rankings are being wired up next.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-overlay hidden" id="setup">
+    <div class="setup-card">
+      <div class="setup-title">Connect your sheet</div>
+      <div class="setup-help">
+        Paste the <b>published CSV link</b> for the Hustle Games sheet
+        (Google Sheets → File → Share → Publish to web → CSV, then copy that URL).
+        This is saved on this device only — every other floor screen needs its own paste.
+      </div>
+      <input id="setup-input" type="text" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" />
+      <button id="setup-save">Save &amp; launch</button>
+      <div class="setup-note">Double-click "HUSTLE GAMES" in the top-left any time to change this link.</div>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">SYNCING LEADERBOARD…</div>
+
+<script>
+/* ============================================================
+   CONFIG — edit these to retune cutoffs, refresh rate, or
+   point this at a different published-CSV sheet.
+   ============================================================ */
+const CONFIG = {
+  csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRDhSYdemFGT5AEIFocgG7DsbaMFQMzKmioyaR0GZ33wieSfJxyATqX_un9PkETaQg6pGTMIwZz_KR-/pub?gid=469310515&single=true&output=csv',
+  refreshMs: 30000,        // how often to re-fetch live data
+  scrollSecPerRow: 1.15,   // marquee speed: seconds per row of the "rest of roster" list
+  categories: [
+    {
+      key: 'rookies', label: 'ROOKIES', tenure: '0–6 months tenure',
+      topN: 15, cols: { rank: 0, email: 1, points: 2, pod: 3 },
+      footer: 'Newest on the floor. This is where the biggest jumps happen.'
+    },
+    {
+      key: 'contenders', label: 'CONTENDERS', tenure: '6–12 months tenure',
+      topN: 5, cols: { rank: 5, email: 6, points: 7, pod: 8 },
+      footer: 'The sharpest cut on the floor — pace has to turn into proof.'
+    },
+    {
+      key: 'veterans', label: 'VETERANS', tenure: '12+ months tenure',
+      topN: 10, cols: { rank: 10, email: 11, points: 12, pod: 13 },
+      footer: 'Deepest pool, steepest ladder. The top spots are earned, not inherited.'
+    }
+  ]
+};
+
+/* ============================================================
+   Minimal CSV parser (handles quoted fields just in case)
+   ============================================================ */
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+/* ============================================================
+   Build one category's row list from the parsed sheet
+   ============================================================ */
+function buildCategoryRows(rawRows, cat){
+  const out = [];
+  for (let i = 1; i < rawRows.length; i++){
+    const r = rawRows[i];
+    if (!r) continue;
+    const email = (r[cat.cols.email] || '').trim();
+    if (!email) break; // end of this category's block
+    const rank = (r[cat.cols.rank] || '').trim() || String(out.length + 1);
+    const pts = parseFloat(r[cat.cols.points]);
+    const pod = (r[cat.cols.pod] || '').trim();
+    out.push({
+      rank: parseInt(rank, 10),
+      email,
+      points: isNaN(pts) ? 0 : pts,
+      pod: pod || '—'
+    });
+  }
+  return out;
+}
+
+function tierClass(rank, topN){
+  if (rank <= 3) return 'tier-gold';
+  if (rank <= topN) return 'tier-red';
+  return 'tier-neutral';
+}
+
+function rowHTML(r, topN){
+  const cls = tierClass(r.rank, topN);
+  const ptsCls = r.rank === 1 ? 'pts leader' : 'pts';
+  return `<div class="row ${cls}">
+    <span class="bar"></span>
+    <span class="rank">#${r.rank}</span>
+    <span class="email" title="${r.email}">${r.email}</span>
+    <span class="pod" title="${r.pod}">${r.pod}</span>
+    <span class="${ptsCls}">${r.points.toFixed(2)}</span>
+  </div>`;
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function ensurePanelsBuilt(){
+  const row = document.getElementById('leaderboard-row');
+  if (!row || row.dataset.built) return;
+  row.innerHTML = CONFIG.categories.map(cat => `
+    <div class="col" data-key="${cat.key}">
+      <div class="cat-title">
+        <span class="name">${cat.label}</span>
+        <span class="sep">·</span>
+        <span class="count" data-count></span>
+      </div>
+      <div class="cat-sub"><span data-sub></span></div>
+
+      <div class="colhead">
+        <span></span><span>Rank</span><span>Owner Email</span><span>Pod</span><span>Pts</span>
+      </div>
+
+      <div class="eyebrow gold"><span data-podium-label></span></div>
+      <div class="podium" data-podium></div>
+
+      <div class="eyebrow muted"><span data-roster-label></span></div>
+      <div class="scroll-viewport" data-viewport>
+        <div class="scroll-track" data-track></div>
+      </div>
+
+      <div class="footer-note">${cat.footer}</div>
+    </div>
+  `).join('');
+  row.dataset.built = '1';
+}
+
+function renderCategory(cat, rows){
+  const col = document.querySelector(`.col[data-key="${cat.key}"]`);
+  if (!col) return;
+
+  col.querySelector('[data-count]').textContent = `${rows.length} BDAs`;
+  col.querySelector('[data-sub]').textContent = `${cat.tenure}  ·  Top ${cat.topN} win`;
+
+  const pinned = rows.slice(0, cat.topN);
+  const rest = rows.slice(cat.topN);
+
+  col.querySelector('[data-podium-label]').textContent = `Live podium — top ${cat.topN}`;
+  const podiumEl = col.querySelector('[data-podium]');
+  podiumEl.innerHTML = pinned.map(r => rowHTML(r, cat.topN)).join('');
+
+  const viewport = col.querySelector('[data-viewport]');
+  const track = col.querySelector('[data-track]');
+
+  if (!rest.length){
+    col.querySelector('[data-roster-label]').textContent = '';
+    viewport.style.display = 'none';
+    return;
+  }
+
+  viewport.style.display = 'block';
+  col.querySelector('[data-roster-label]').textContent =
+    `Full roster — rank ${cat.topN + 1}–${rows.length}`;
+
+  const restHTML = rest.map(r => rowHTML(r, cat.topN)).join('');
+  track.innerHTML = restHTML + restHTML; // duplicated for seamless loop
+  const seconds = Math.max(20, rest.length * CONFIG.scrollSecPerRow);
+  track.style.animation = `scrollLoop ${seconds}s linear infinite`;
+}
+
+/* Inject the keyframe once (depends on element's own height via -50%) */
+(function injectKeyframes(){
+  const style = document.createElement('style');
+  style.textContent = `@keyframes scrollLoop { from { transform: translateY(0); } to { transform: translateY(-50%); } }`;
+  document.head.appendChild(style);
+})();
+
+/* ============================================================
+   Fetch + refresh loop
+   ============================================================ */
+let hasLoadedOnce = false;
+
+async function refresh(){
+  try{
+    const res = await fetch(CONFIG.csvUrl + (CONFIG.csvUrl.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('bad response');
+    const text = await res.text();
+    const rawRows = parseCSV(text);
+
+    ensurePanelsBuilt();
+
+    CONFIG.categories.forEach(cat => {
+      const rows = buildCategoryRows(rawRows, cat).sort((a, b) => b.points - a.points);
+      renderCategory(cat, rows);
+    });
+
+    hasLoadedOnce = true;
+    document.getElementById('loading').classList.add('hidden');
+  } catch (e){
+    // Once we've loaded successfully once, fail silently and keep last good data on screen.
+    // Before that first success, surface the real reason instead of spinning forever.
+    if (!hasLoadedOnce){
+      const el = document.getElementById('loading');
+      el.innerHTML = 'SYNCING LEADERBOARD…<br><span style="font-family:Poppins,sans-serif;font-weight:500;letter-spacing:0.02em;font-size:12px;color:#93A0C7;text-transform:none;">' +
+        'Last error: ' + (e && e.message ? e.message : e) + ' — retrying every ' + Math.round(CONFIG.refreshMs/1000) + 's</span>';
+    }
+  }
+}
+
+function tickClock(){
+  const el = document.getElementById('ts');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+
+/* ============================================================
+   Settings: where the sheet link actually lives
+   ============================================================ */
+const STORAGE_KEY = 'hustleGamesCsvUrl';
+let refreshTimer = null;
+
+function readSavedUrl(){
+  try { return localStorage.getItem(STORAGE_KEY); } catch(e){ return null; }
+}
+function writeSavedUrl(url){
+  try { localStorage.setItem(STORAGE_KEY, url); } catch(e){ /* ignore */ }
+}
+
+function launch(url){
+  CONFIG.csvUrl = url.trim();
+  writeSavedUrl(CONFIG.csvUrl);
+  document.getElementById('setup').classList.add('hidden');
+  document.body.classList.add('kiosk');
+  hasLoadedOnce = false;
+  const loadingEl = document.getElementById('loading');
+  loadingEl.innerHTML = 'SYNCING LEADERBOARD…';
+  loadingEl.classList.remove('hidden');
+  if (refreshTimer) clearInterval(refreshTimer);
+  refresh();
+  refreshTimer = setInterval(refresh, CONFIG.refreshMs);
+}
+
+function initSettings(){
+  const overlay = document.getElementById('setup');
+  const input = document.getElementById('setup-input');
+  const saveBtn = document.getElementById('setup-save');
+  const saved = readSavedUrl();
+
+  input.value = saved || CONFIG.csvUrl;
+
+  saveBtn.addEventListener('click', () => { if (input.value.trim()) launch(input.value); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) launch(input.value);
+  });
+  document.querySelector('.brand').addEventListener('dblclick', () => {
+    input.value = CONFIG.csvUrl;
+    document.body.classList.remove('kiosk');
+    overlay.classList.remove('hidden');
+  });
+
+  // The dashboard is always on screen — no setup gate blocking it.
+  // Uses whatever was saved on this device, otherwise the default sheet above.
+  overlay.classList.add('hidden');
+  launch(saved || CONFIG.csvUrl);
+}
+
+initSettings();
+tickClock();
+setInterval(tickClock, 1000);
+
+/* ============================================================
+   Tabs: Leaderboard / Managers & AGM
+   ============================================================ */
+function activateTab(key){
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === key));
+}
+
+function initTabs(){
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+  activateTab('leaderboard');
+}
+
+initTabs();
+</script>
+</body>
+</html>
